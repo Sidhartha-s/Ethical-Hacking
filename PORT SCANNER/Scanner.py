@@ -1,14 +1,13 @@
-from flask import Flask, request, render_template, jsonify
+from flask import Flask, request, render_template, jsonify, Response
 import nmap
 import requests
-import json
-from concurrent.futures import *
 import concurrent.futures
 import threading
 import socket
+import time
 
 app = Flask(__name__)
-IPAPI_API_KEY = '0ace3c0c7c3531'  # Replace with your 'ipinfo.io' API key
+IPAPI_API_KEY = '0ace3c0c7c3531' 
 
 @app.route('/')
 def index():
@@ -21,7 +20,6 @@ def scan():
     port_range = request.form.get('portRange')
     scan_type = request.form.get('scanType')
 
-    # Convert the domain name to an IP address
     try:
         ip_address = socket.gethostbyname(domain_name)
     except socket.gaierror:
@@ -32,7 +30,7 @@ def scan():
 
     results = []
 
-    with ThreadPoolExecutor(max_workers=5) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
         future_to_target = {executor.submit(scan_target, target, port_range, scan_type): target for target in [ip_address] + targets_list}
         for future in concurrent.futures.as_completed(future_to_target):
             target = future_to_target[future]
@@ -56,11 +54,6 @@ def scan_target(target, port_range, scan_type):
     open_ports = perform_scan(target, port_range, scan_type)
     geolocation_data = get_geolocation(target)
     return open_ports, geolocation_data
-
-def save_to_json(data, filename):
-    with open(filename, 'w') as file:
-        json.dump(data, file, indent=4)
-    print(f"Results saved to {filename}")
 
 def multi_threaded_scan(targets, port_range, scan_type):
     results = []
@@ -98,5 +91,18 @@ def get_geolocation(ip_address):
     data = response.json()
     return data
 
+@app.route('/scan-updates')
+def scan_updates():
+    def generate_updates():
+        yield "Scanning target 1...\n"
+        time.sleep(2)
+        yield "Scanning target 2...\n"
+        time.sleep(2)
+        yield "Scanning target 3...\n"
+        time.sleep(2)
+        yield "Scan complete."
+
+    return Response(generate_updates(), content_type='text/event-stream')
+
 if __name__ == "__main__":
-    app.run(debug=True)
+            app.run(debug=True)
